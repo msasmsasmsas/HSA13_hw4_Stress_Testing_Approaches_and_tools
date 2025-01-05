@@ -1,16 +1,46 @@
-# This is a sample Python script.
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+app = FastAPI()
+
+DATABASE_URL = "sqlite:///./test.db"
+Base = declarative_base()
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+class RequestData(Base):
+    __tablename__ = "request_data"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, index=True)
+    value = Column(String, index=True)
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+Base.metadata.create_all(bind=engine)
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+
+class Data(BaseModel):
+    key: str
+    value: str
+
+
+@app.post("/data/")
+async def store_data(data: Data):
+    db = SessionLocal()
+    db_data = RequestData(key=data.key, value=data.value)
+    db.add(db_data)
+    db.commit()
+    db.refresh(db_data)
+    db.close()
+    return {"message": "Data stored successfully"}
+
+
+@app.get("/data/")
+async def get_data():
+    db = SessionLocal()
+    result = db.query(RequestData).all()
+    db.close()
+    return result
